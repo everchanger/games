@@ -39,6 +39,17 @@ We are **not** building full async infrastructure, notifications, matchmaking, p
 
 ---
 
+## Rules Source of Truth
+
+Implementation should follow:
+- `GAME_DESIGN_DOCUMENT.md` for product intent and design goals
+- `plan.md` for implementation sequencing and scope
+- `RULES_SPEC_V1.md` for exact POC rules and simulation behavior
+
+If there is ambiguity between documents during implementation, `RULES_SPEC_V1.md` should win for game logic decisions in the first prototype.
+
+---
+
 ## Product Slice We Should Build First
 
 A single playable match should support:
@@ -57,14 +68,45 @@ That is the smallest complete loop worth testing.
 
 ---
 
-## Rules Source of Truth
+## Architecture Principle: Game Logic Must Be Framework-Agnostic
 
-Implementation should follow:
-- `GAME_DESIGN_DOCUMENT.md` for product intent and design goals
-- `plan.md` for implementation sequencing and scope
-- `RULES_SPEC_V1.md` for exact POC rules and simulation behavior
+The core game logic must **not** live inside React components, hooks, or UI-only state code.
 
-If there is ambiguity between documents during implementation, `RULES_SPEC_V1.md` should win for game logic decisions in the first prototype.
+All gameplay rules, simulation, actions, ticking, victory checks, hidden information handling, and match transitions must live in a pure TypeScript domain layer.
+
+React should be treated as a rendering and input layer only.
+
+### Why this is required
+- gameplay must be deterministic and testable
+- rules should be reusable outside the UI
+- simulation bugs should be caught by automated tests before deployment
+- future migration to another client/runtime should not require rewriting game rules
+
+### Required rule
+UI components may:
+- render game state
+- gather player input
+- dispatch domain commands
+- subscribe to state updates
+
+UI components may **not**:
+- contain authoritative gameplay formulas
+- mutate canonical game state directly
+- implement hidden information rules ad hoc
+- contain one-off action resolution logic
+
+---
+
+## Required Project Structure
+
+Recommended separation:
+- `src/game/` → pure gameplay domain
+- `src/data/` → persistence adapters
+- `src/ui/` or `src/components/` → React presentation
+- `src/app/` → wiring, screens, orchestration
+- `src/test/` and/or colocated `*.test.ts` → automated tests
+
+The domain layer should be usable from tests without rendering React at all.
 
 ---
 
@@ -144,8 +186,20 @@ Suggested files:
 - `src/game/simulation.ts`
 - `src/game/match.ts`
 - `src/game/seed.ts`
+- `src/game/reducer.ts`
+- `src/game/selectors.ts`
 
 This layer should know nothing about React.
+
+### Suggested domain API shape
+The UI should call pure functions such as:
+- `createMatch()`
+- `applyTurn(match, turnInput)`
+- `advanceTick(match)`
+- `getVisibleState(match, viewerRole)`
+- `checkWinner(match)`
+
+The exact names can vary, but the architecture principle should remain.
 
 ---
 
@@ -168,6 +222,8 @@ Suggested components:
 - `EfficiencyDeltaPanel`
 - `MatchSummaryCard`
 
+These should consume derived visible state from the domain layer rather than re-deriving rules locally.
+
 ---
 
 ## 3. Persistence Layer
@@ -184,6 +240,36 @@ Suggested file:
 
 Implement first with:
 - `localStorageMatchRepository`
+
+---
+
+## Testing Strategy Requirement
+
+The project must include an automated test suite for the gameplay domain before deployment.
+
+### Minimum requirement
+Tests should run in CI and verify:
+- action cost validation
+- turn order enforcement
+- tick progression
+- efficiency calculation
+- hidden information visibility rules
+- fault trigger timing
+- win condition detection
+- selected core actions behaving as specified
+
+### Test types
+At minimum include:
+1. **unit tests** for pure functions
+2. **integration-style domain tests** for short match sequences
+
+Optional later:
+- component tests
+- end-to-end browser tests
+
+### CI requirement
+The GitHub Actions pipeline should fail if gameplay tests fail.
+Deployment should depend on passing tests.
 
 ---
 
@@ -416,9 +502,10 @@ Could simply show:
 - set up linting/formatting if desired, but keep light
 - set up GitHub Actions build/deploy to GitHub Pages
 - create README with run/build/deploy instructions
+- set up test runner and CI test step immediately
 
 ### Deliverable
-A deployed shell app reachable on GitHub Pages.
+A deployed shell app reachable on GitHub Pages with tests wired into CI.
 
 ---
 
@@ -430,6 +517,7 @@ A deployed shell app reachable on GitHub Pages.
 - implement hidden-action storage structure
 - implement ticking simulation
 - implement basic victory conditions
+- add tests for core domain functions as they are created
 
 ### Deliverable
 Game rules exist in TypeScript and can be tested without UI.
@@ -455,6 +543,7 @@ Can play turns manually in-browser while the system keeps ticking.
 - surface only visible state and minimal deltas
 - reveal hidden faults only when surfaced or inspected
 - verify the board alone is enough to understand what matters
+- add domain integration tests for representative turn sequences
 
 ### Deliverable
 First full playable hidden-information loop.
@@ -530,6 +619,7 @@ Suggested main entities:
 
 Use a GitHub Actions workflow that:
 - installs dependencies
+- runs gameplay tests
 - builds the static app
 - publishes the build output to GitHub Pages
 
@@ -537,6 +627,7 @@ Requirements:
 - set proper base path for repo deployment if needed
 - document Pages setup in README
 - ensure the app works as a pure static site
+- do not deploy if tests fail
 
 This is another reason to avoid backend dependency in v1.
 
@@ -581,11 +672,12 @@ These should stay configurable while building:
 
 1. Implement `RULES_SPEC_V1.md`.
 2. Scaffold the web app and GitHub Pages deployment.
-3. Implement the pure game domain layer.
-4. Build the 4-node board UI.
-5. Implement the 6+6 action sets.
-6. Implement ticking and visible-state feedback.
-7. Playtest locally before considering any backend.
+3. Set up the domain-layer test suite and CI gating.
+4. Implement the pure game domain layer.
+5. Build the 4-node board UI.
+6. Implement the 6+6 action sets.
+7. Implement ticking and visible-state feedback.
+8. Playtest locally before considering any backend.
 
 ---
 
@@ -598,5 +690,7 @@ It should prove:
 - the action economy creates choices
 - the candy-factory wrapper helps clarity and charm
 - visible ticking creates urgency without requiring real multiplayer
+
+And it must do so with a **framework-agnostic gameplay domain** protected by an **automated test suite that runs before deployment**.
 
 Only after that should we decide whether to add real async backend support like Firebase.
