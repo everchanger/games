@@ -20,11 +20,27 @@ describe('visibility and hidden info', () => {
     }).match
 
     const afterInspection = getVisibleState(inspected, 'Stabilizer')
-    expect(afterInspection.nodes.find((node) => node.id === 'packaging-line')?.revealedFaults).toEqual(['ingredientSwap'])
+    expect(afterInspection.nodes.find((node) => node.id === 'packaging-line')?.revealedFaults).toEqual(['Ingredient Swap'])
 
     const triggered = advanceOneTick(advanceOneTick(sabotaged))
     const afterTrigger = getVisibleState(triggered, 'Stabilizer')
-    expect(afterTrigger.nodes.find((node) => node.id === 'packaging-line')?.revealedFaults).toEqual(['ingredientSwap'])
+    expect(afterTrigger.nodes.find((node) => node.id === 'packaging-line')?.revealedFaults).toEqual(['Ingredient Swap'])
+  })
+
+  it('keeps sugar rush spike hidden until its crash becomes visible', () => {
+    const saboteurTurn = endTurn(createMatch(0))
+    const sabotaged = applyAction(saboteurTurn, {
+      actionId: 'sugar-rush-spike',
+      targets: ['mixing-vat'],
+    }).match
+
+    const afterBoostTick = advanceOneTick(sabotaged)
+    const boostView = getVisibleState(afterBoostTick, 'Stabilizer')
+    expect(boostView.nodes.find((node) => node.id === 'mixing-vat')?.revealedFaults).toEqual([])
+
+    const afterCrashTick = advanceOneTick(afterBoostTick)
+    const crashView = getVisibleState(afterCrashTick, 'Stabilizer')
+    expect(crashView.nodes.find((node) => node.id === 'mixing-vat')?.revealedFaults).toEqual(['Sugar Rush Spike'])
   })
 
   it('applies false reading only to visible integrity tier', () => {

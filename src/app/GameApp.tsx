@@ -12,10 +12,10 @@ import {
   type MatchState,
   type NodeId,
 } from '../game'
-import { clearMatch, loadMatch, saveMatch } from '../data/matchStorage'
+import { localStorageMatchRepository } from '../data/matchRepository'
 
 const initializeMatch = (): MatchState => {
-  const saved = loadMatch()
+  const saved = localStorageMatchRepository.load()
 
   if (!saved) {
     return createMatch()
@@ -41,12 +41,12 @@ function GameApp() {
   const [error, setError] = useState<string>('')
   const [now, setNow] = useState<number>(Date.now())
 
-  const availableActions = useMemo(() => getActionsForRole(match.activeRole), [match.activeRole])
+  const visible = useMemo(() => getVisibleState(match, match.activeRole), [match])
+  const availableActions = useMemo(() => getActionsForRole(visible.activeRole), [visible.activeRole])
   const selectedAction = useMemo(
     () => availableActions.find((action) => action.id === selectedActionId) ?? pickDefaultAction(availableActions),
     [availableActions, selectedActionId],
   )
-  const visible = useMemo(() => getVisibleState(match, match.activeRole), [match])
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -58,7 +58,7 @@ function GameApp() {
   }, [])
 
   useEffect(() => {
-    saveMatch(match)
+    localStorageMatchRepository.save(match)
   }, [match])
 
   useEffect(() => {
@@ -110,7 +110,7 @@ function GameApp() {
   }
 
   const handleNewMatch = (): void => {
-    clearMatch()
+    localStorageMatchRepository.clear()
     setMatch(createMatch())
     setError('')
     setSelectedTargets([])
@@ -172,7 +172,7 @@ function GameApp() {
       </section>
 
       <section className="panel controls">
-        <h2>Available actions ({match.activeRole})</h2>
+        <h2>Available actions ({visible.activeRole})</h2>
         <label>
           Action
           <select value={selectedAction.id} onChange={(event) => setSelectedActionId(event.target.value as ActionDefinition['id'])}>
@@ -205,7 +205,7 @@ function GameApp() {
       <footer className="panel">
         <h2>Action catalog</h2>
         <ul>
-          {ACTIONS.filter((action) => action.role === match.activeRole).map((action) => (
+          {ACTIONS.filter((action) => action.role === visible.activeRole).map((action) => (
             <li key={action.id}>
               {action.label} — {action.cost} AP
             </li>

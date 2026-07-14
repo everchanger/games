@@ -28,6 +28,46 @@ const shiftTierHealthier = (tier: IntegrityTier): IntegrityTier => {
   return tier
 }
 
+const toVisibleStatusName = (status: string): string => {
+  if (status === 'mildStrain') {
+    return 'Mild strain'
+  }
+
+  if (status === 'majorStrain') {
+    return 'Major strain'
+  }
+
+  if (status === 'spill') {
+    return 'Sticky spill'
+  }
+
+  if (status === 'speedBoost' || status === 'sugarRushBoost') {
+    return 'Boost'
+  }
+
+  if (status === 'gumSlowdown' || status === 'sugarCrashSlowdown') {
+    return 'Slowdown'
+  }
+
+  if (status === 'reroute') {
+    return 'Reroute'
+  }
+
+  return 'Status'
+}
+
+const toVisibleFaultName = (faultType: string): string => {
+  if (faultType === 'ingredientSwap') {
+    return 'Ingredient Swap'
+  }
+
+  if (faultType === 'sugarRushSpike') {
+    return 'Sugar Rush Spike'
+  }
+
+  return 'Fault'
+}
+
 const toVisibleNode = (match: MatchState, viewerRole: Role): VisibleNodeState[] =>
   match.nodes.map((node) => {
     const activeStatuses = node.statuses.filter(
@@ -36,33 +76,7 @@ const toVisibleNode = (match: MatchState, viewerRole: Role): VisibleNodeState[] 
     const statusNames = activeStatuses
       .map((status) => status.type)
       .filter((status) => status !== 'falseReading')
-      .map((status) => {
-        if (status === 'mildStrain') {
-          return 'Mild strain'
-        }
-
-        if (status === 'majorStrain') {
-          return 'Major strain'
-        }
-
-        if (status === 'spill') {
-          return 'Sticky spill'
-        }
-
-        if (status === 'speedBoost' || status === 'sugarRushBoost') {
-          return 'Boost'
-        }
-
-        if (status === 'gumSlowdown' || status === 'sugarCrashSlowdown') {
-          return 'Slowdown'
-        }
-
-        if (status === 'reroute') {
-          return 'Reroute'
-        }
-
-        return 'Status'
-      })
+      .map(toVisibleStatusName)
 
     const isFalseReadingActive = activeStatuses.some((status) => status.type === 'falseReading')
     const baseTier = toTier(node.integrity)
@@ -74,7 +88,7 @@ const toVisibleNode = (match: MatchState, viewerRole: Role): VisibleNodeState[] 
       integrityTier: visibleTier,
       hasBuffer: node.hasBuffer,
       visibleStatuses: statusNames,
-      revealedFaults: node.hiddenFaults.filter((fault) => fault.revealed).map((fault) => fault.type),
+      revealedFaults: node.hiddenFaults.filter((fault) => fault.revealed).map((fault) => toVisibleFaultName(fault.type)),
     }
   })
 
