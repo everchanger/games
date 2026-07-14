@@ -55,6 +55,57 @@ describe('simulation and ticking', () => {
     expect(resumed.lastTickAt).toBe(20_000)
   })
 
+  it('replays the same deterministic ticks when resuming with delayed faults pending', () => {
+    const saboteurTurn = endTurn(createMatch(0))
+    const planted = applyAction(saboteurTurn, {
+      actionId: 'ingredient-swap',
+      targets: ['mixing-vat'],
+    }).match
+
+    const manual = advanceOneTick(advanceOneTick(planted))
+    const resumed = advanceByElapsedTime(planted, 20_000)
+
+    expect(resumed).toEqual({
+      ...manual,
+      lastTickAt: 20_000,
+    })
+  })
+
+  it('uses reroute batch to reduce a bottleneck penalty for one tick, then applies strain', () => {
+    const match = createMatch(0)
+    match.nodes[0]!.integrity = 20
+
+    const baseline = advanceOneTick(match)
+    const rerouted = advanceOneTick(
+      applyAction(match, {
+        actionId: 'reroute-batch',
+        targets: ['ingredient-hopper'],
+      }).match,
+    )
+
+    expect(baseline.efficiency).toBe(42)
+    expect(rerouted.efficiency).toBe(58)
+    expect(rerouted.nodes[0]?.integrity).toBe(18)
+  })
+
+  it('models sugar rush spike as a delayed boost-then-crash fault', () => {
+    const saboteurTurn = endTurn(createMatch(0))
+    const sabotaged = applyAction(saboteurTurn, {
+      actionId: 'sugar-rush-spike',
+      targets: ['mixing-vat'],
+    }).match
+
+    const boosted = advanceOneTick(sabotaged)
+    const nodeAfterBoost = boosted.nodes.find((node) => node.id === 'mixing-vat')!
+    expect(nodeAfterBoost.integrity).toBe(74)
+
+    const crashed = advanceOneTick(boosted)
+    const nodeAfterCrash = crashed.nodes.find((node) => node.id === 'mixing-vat')!
+    expect(nodeAfterCrash.integrity).toBe(64)
+    expect(nodeAfterCrash.hiddenFaults.map((fault) => fault.type)).toContain('sugarRushSpike')
+    expect(nodeAfterCrash.hiddenFaults.every((fault) => fault.revealed)).toBe(true)
+  })
+
   it('detects winners at threshold edges', () => {
     const stabilizerMatch = createMatch(0)
     stabilizerMatch.efficiency = 99

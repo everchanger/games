@@ -32,10 +32,9 @@ export interface StatusEffect {
 
 export interface HiddenFault {
   id: string
-  type: 'ingredientSwap'
+  type: 'ingredientSwap' | 'sugarRushSpike'
   triggerAtTick: number
   revealed: boolean
-  activeUntilTick?: number
 }
 
 export interface NodeState {
