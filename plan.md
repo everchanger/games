@@ -1,7 +1,7 @@
 # Implementation Plan
 
 ## Goal
-Build a tight first playable web POC for the async two-player candy-factory duel described in `GAME_DESIGN_DOCUMENT.md`, using the deep research recommendations as the implementation baseline.
+Build a tight first playable web POC for the async two-player candy-factory duel described in `GAME_DESIGN_DOCUMENT.md`, using the deep research recommendations as the implementation baseline and `RULES_SPEC_V1.md` as the implementation source of truth for game rules.
 
 This plan is intentionally narrower than the full GDD.
 The purpose is to validate:
@@ -9,6 +9,7 @@ The purpose is to validate:
 - the feel of alternating async turns
 - whether builder vs saboteur is fun in practice
 - whether the board is readable on web/mobile-sized screens
+- whether visible ticking creates urgency even in a single-device prototype
 
 We are **not** building full async infrastructure, notifications, matchmaking, progression, or production-ready backend yet.
 
@@ -20,18 +21,21 @@ We are **not** building full async infrastructure, notifications, matchmaking, p
 - **Web application**
 - **2D board**
 - **candy-factory presentation** with bright, playful visuals
-- **strict turn-based async structure**, but for now testable locally or in a lightweight shared-state setup
+- **strict turn-based structure with continuous ticking between turns**
+- **single-device / single-browser-session testability first**
 - **theme-light mechanics-first implementation**
+- **visible state over heavy reporting**
 
 ### Explicitly out of scope for this first slice
 - notifications
 - response timers enforcement
-- live real-time gameplay
+- live real-time multiplayer
 - deep persistence architecture
 - multiple board types
 - progression/meta systems
 - social systems
 - advanced animation polish
+- rich diagnostic reporting UI
 
 ---
 
@@ -39,17 +43,28 @@ We are **not** building full async infrastructure, notifications, matchmaking, p
 
 A single playable match should support:
 1. viewing the current shared factory board
-2. seeing current batch rate and node status
-3. taking a turn as Stabilizer or Saboteur
+2. seeing current batch rate and node state
+3. taking a turn as Stabilizer or Saboteur on one device
 4. spending an action budget on 1–3 actions
 5. hiding exact opponent actions
-6. resolving the system after both sides have acted
-7. showing a readable Batch Report
+6. ticking the system forward continuously in the POC at a fixed interval
+7. showing efficiency changes primarily through the live board state
 8. continuing until:
    - Stabilizer reaches target output
    - Saboteur collapses output to zero
 
 That is the smallest complete loop worth testing.
+
+---
+
+## Rules Source of Truth
+
+Implementation should follow:
+- `GAME_DESIGN_DOCUMENT.md` for product intent and design goals
+- `plan.md` for implementation sequencing and scope
+- `RULES_SPEC_V1.md` for exact POC rules and simulation behavior
+
+If there is ambiguity between documents during implementation, `RULES_SPEC_V1.md` should win for game logic decisions in the first prototype.
 
 ---
 
@@ -117,17 +132,18 @@ Create pure TypeScript modules for:
 - action definitions
 - turn budget validation
 - hidden info handling
-- resolution simulation
+- ticking simulation
 - victory checks
-- batch report generation
+- minimal efficiency delta summary
+- match state transitions
 
 Suggested files:
 - `src/game/types.ts`
 - `src/game/constants.ts`
 - `src/game/actions.ts`
 - `src/game/simulation.ts`
-- `src/game/reports.ts`
 - `src/game/match.ts`
+- `src/game/seed.ts`
 
 This layer should know nothing about React.
 
@@ -139,7 +155,8 @@ Main screens/components:
 - match board view
 - action selection panel
 - pending turn summary
-- resolution / batch report modal
+- live efficiency panel
+- minimal change summary UI
 - role switch / local test controls
 
 Suggested components:
@@ -148,7 +165,7 @@ Suggested components:
 - `BatchRateGauge`
 - `ActionPanel`
 - `TurnBudgetBar`
-- `BatchReportModal`
+- `EfficiencyDeltaPanel`
 - `MatchSummaryCard`
 
 ---
@@ -173,8 +190,7 @@ Implement first with:
 ## Board Structure to Implement
 
 ## Initial board
-Use **4 main nodes first**, not 5.
-Defer the side node until the loop is proven fun.
+Use **4 main nodes first**.
 
 Initial pipeline:
 1. Ingredient Hopper
@@ -205,7 +221,9 @@ Track:
 - target batch rate (100)
 - winner if any
 - pending hidden actions for current exchange
-- last resolution report
+- last visible efficiency delta
+- simulation seed/state
+- timestamp of last tick
 
 ---
 
@@ -213,47 +231,23 @@ Track:
 
 Implement **6 actions per role** for the first POC.
 That is enough variety without overloading the first build.
+The exact effects should follow `RULES_SPEC_V1.md`.
 
 ## Stabilizer actions
 1. **Polish the Gears** — cost 1
-   - restore integrity to one node
-
 2. **Speed Boost** — cost 2
-   - increase throughput on one node this resolution
-   - add strain risk next exchange
-
 3. **Add Reserve Tank** — cost 2
-   - adds one buffer to a node
-   - slight throughput penalty while installed
-
 4. **Reroute Batch** — cost 2
-   - bypass one troubled node for one resolution
-   - side effect: bypassed node passively degrades
-
 5. **Deep Inspection** — cost 3
-   - reveals hidden faults on one node
-
 6. **Emergency Patch** — cost 1
-   - removes or softens one visible problem quickly
 
 ## Saboteur actions
 1. **Sticky Spill** — cost 1
-   - immediate throughput penalty on one node
-
 2. **Ingredient Swap** — cost 2
-   - plant hidden fault with trigger chance in later resolution
-
 3. **Gum the Works** — cost 2
-   - add desync between adjacent nodes
-
 4. **False Reading** — cost 2
-   - hide or misreport one node’s visible symptoms
-
 5. **Sugar Rush Spike** — cost 2
-   - temporary throughput boost now, degradation later
-
 6. **Coolant Drain** — cost 3
-   - structural disruption action affecting multiple connected nodes
 
 ### Important implementation rule
 Do **not** implement these as direct mirror counters.
@@ -291,64 +285,50 @@ This is one of the most important parts of the POC.
 - whether a node has a buffer
 - current batch rate
 - current turn / active player
-- whether a node was active or problematic last resolution
+- visible status effects
+- latest efficiency delta once the opposing player has taken their turn / state has advanced
 
 ### Hidden
 - exact opponent actions chosen
-- exact target of opponent actions unless exposed by consequences
+- exact target of opponent actions unless exposed by visible consequences
 - untriggered hidden faults
 - planted sabotage history
 
 ### Conditionally revealed
 - hidden faults become visible if:
-  - they trigger during resolution
+  - they trigger during ticking
   - player uses Deep Inspection
 
 ### UI rule
 Never show a raw move log like:
 - “Player B used Ingredient Swap on Mixing Vat”
 
-Always convert opponent actions into:
-- symptoms
-- state changes
-- report lines
+Favor visible state and light summaries over explicit reports.
 
 ---
 
-## Result / Batch Report Model
+## Minimal Reporting / Feedback Model
 
-After both players complete their turns for an exchange, generate:
+For the POC, keep reporting light.
+Do **not** build a large report modal as a requirement for v1.
 
-### 1. Short resolution animation
-Minimal for first pass:
-- animate flow through nodes
-- flash stressed nodes
-- show output rising/falling
+Primary feedback should come from:
+- current batch rate
+- last visible efficiency delta
+- node integrity tier changes
+- visible status effects on nodes
+- triggered fault visibility if surfaced
 
-Keep this simple in v1.
-It can be mostly UI transitions, not full rich animation.
+### Minimal summary
+A compact summary is enough, for example:
+- `Efficiency +6`
+- `Efficiency -11`
 
-### 2. Batch Report modal
-Show:
-- shift/exchange number
-- current batch rate and delta
-- 2–4 symptom lines
-- integrity changes by node
-- triggered hidden faults if any
-- button to continue
+Optional lightweight support text later:
+- `Mixing improved`
+- `Conveyor strained`
 
-### Symptom design requirement
-Symptoms must describe **effect categories**, not action names.
-Examples:
-- flow reduced
-- timing misalignment
-- irregular rotation
-- buffer depleted
-- integrity at risk
-- fault activated
-- unknown issue detected
-
-Build these from a strict enum / rules table, not ad hoc strings.
+But the first POC should rely mainly on the visible state of the board.
 
 ---
 
@@ -356,44 +336,44 @@ Build these from a strict enum / rules table, not ad hoc strings.
 
 ## Simplified first POC flow
 1. Create a new match
-2. Match starts at about **50% batch rate**
+2. Match starts at **50% batch rate**
 3. Stabilizer acts first
 4. Stabilizer spends AP and ends turn
-5. Saboteur sees updated visible state, but not exact stabilizer actions
-6. Saboteur spends AP and ends turn
-7. System resolves
-8. Batch Report is shown
-9. Victory check runs
-10. If no winner, next exchange begins with Stabilizer again or alternating initiative depending on configuration
+5. Stabilizer actions apply immediately
+6. System begins ticking every **10 seconds** in the local-device POC
+7. Saboteur sees current visible state, not exact stabilizer actions
+8. Saboteur spends AP and ends turn
+9. Saboteur actions apply immediately
+10. System continues ticking every **10 seconds**
+11. Stabilizer sees current visible state, not exact saboteur actions
+12. Repeat until batch rate reaches 100 or 0
 
-### Recommendation for v1
-For the first implementation, use:
-- **Stabilizer always first in each exchange pair**
-- one full exchange = Stabilizer turn + Saboteur turn + resolution
-
-That will be easier to reason about than more advanced initiative systems.
+### Important POC note
+For the prototype, the system should feel alive through deterministic ticking, even though the game remains turn-based.
 
 ---
 
 ## Simulation Rules
 
-Keep the simulation deterministic where possible.
-If randomness is used for hidden fault triggers, keep it small, visible in architecture, and easy to tune.
+Follow `RULES_SPEC_V1.md`.
 
-Suggested first-pass simulation steps:
-1. apply temporary action effects
-2. apply hidden fault trigger checks
-3. calculate node strain and integrity changes
-4. propagate throughput through the pipeline
-5. calculate resulting batch rate
-6. produce symptom summary
-7. clear expired temporary effects
-8. save report
+At a high level:
+1. apply immediate action effects
+2. on each tick, update node temporary modifiers
+3. check deterministic hidden fault triggers
+4. calculate node effective throughput from:
+   - base throughput
+   - temporary modifiers
+   - integrity factor
+5. calculate overall batch rate from the pipeline bottleneck-weighted result
+6. update visible board state
+7. check victory conditions
 
 ### Recommendation
 Prefer:
-- mostly deterministic formulas
-- very small amount of randomness only for hidden fault triggers
+- deterministic rules
+- seeded pseudo-random support only if needed later
+- condition or delay based fault triggering first
 
 Too much randomness will destroy deduction quality.
 
@@ -417,10 +397,15 @@ Should show:
 - available actions
 - selected targets
 - end turn button
-- latest batch report access
+- latest efficiency delta
 
-## Screen 3: Batch report modal
-Should appear after resolution.
+This is the most important screen in the POC.
+
+## Screen 3: Optional lightweight summary area
+Not a heavy modal by default.
+Could simply show:
+- latest efficiency change
+- any surfaced visible issue states
 
 ---
 
@@ -443,6 +428,7 @@ A deployed shell app reachable on GitHub Pages.
 - implement action definitions and costs
 - implement turn budget validation
 - implement hidden-action storage structure
+- implement ticking simulation
 - implement basic victory conditions
 
 ### Deliverable
@@ -457,30 +443,29 @@ Game rules exist in TypeScript and can be tested without UI.
 - allow selecting actions and valid targets
 - allow ending turn
 - persist match locally
+- show visible state changes and efficiency delta
 
 ### Deliverable
-Can play turns manually in-browser, even before full resolution polish.
+Can play turns manually in-browser while the system keeps ticking.
 
 ---
 
-## Phase 4 — Resolution and reports
-- implement resolution pipeline
-- generate integrity changes
-- generate batch rate change
-- generate symptom reports
-- show report modal
-- hide exact opponent actions
+## Phase 4 — Hidden info and feedback refinement
+- ensure exact opponent actions are hidden
+- surface only visible state and minimal deltas
+- reveal hidden faults only when surfaced or inspected
+- verify the board alone is enough to understand what matters
 
 ### Deliverable
-First full playable match loop.
+First full playable hidden-information loop.
 
 ---
 
 ## Phase 5 — Test harness and iteration tools
 - add reset match
-- add seed/debug info if useful
+- add seed/debug info in console if useful
 - add quick role switch for local testing
-- add configurable AP values and maybe a debug panel
+- add configurable AP values and maybe a debug panel later if needed
 
 ### Deliverable
 Easy balancing and playtest iteration.
@@ -512,7 +497,9 @@ Suggested main entities:
 - winner
 - nodes[]
 - pendingTurnActions
-- lastReport
+- lastVisibleEfficiencyDelta
+- lastTickAt
+- seedState
 
 ### Node
 - id
@@ -531,14 +518,11 @@ Suggested main entities:
 - optionalSecondaryTargetId
 - cost
 
-### BatchReport
-- exchangeNumber
+### EfficiencySummary
 - batchRateBefore
 - batchRateAfter
-- outputDelta
-- symptomLines[]
-- integrityChanges[]
-- triggeredEvents[]
+- delta
+- surfacedEvents[]
 
 ---
 
@@ -568,15 +552,16 @@ We are testing feel.
 - can take turns as both roles
 - action costs enforced correctly
 - hidden info not leaked in UI
-- resolution updates board correctly
+- ticking updates board correctly every 10 seconds
 - victory conditions trigger correctly
 
 ## Design checks
 - can a new player understand the board quickly?
-- do symptoms feel informative but not too explicit?
+- does visible state provide enough information without a heavy report?
 - do turns feel meaningful with 2–3 actions?
 - does the saboteur feel clever?
 - does the stabilizer feel empowered rather than chore-bound?
+- does ticking create urgency even on one device?
 - do matches feel short and replayable?
 
 ---
@@ -584,10 +569,9 @@ We are testing feel.
 ## Open Implementation Questions
 
 These should stay configurable while building:
-- should hidden faults use chance or deterministic delayed triggers?
-- should initiative alternate after each resolution, or stay fixed?
-- should the stabilizer always begin?
-- how much detail should the report expose?
+- should hidden faults remain purely delay-based or become condition-based later?
+- should initiative ever alternate in later versions?
+- when should efficiency delta be shown and for how long?
 - is 4-node board enough, or do we need the side node quickly?
 - is 4 AP vs 3 AP better than 3 vs 3?
 
@@ -595,22 +579,24 @@ These should stay configurable while building:
 
 ## Recommended Immediate Next Steps
 
-1. Scaffold the web app and GitHub Pages deployment.
-2. Implement the pure game domain layer.
-3. Build the 4-node board UI.
-4. Implement the 6+6 action sets.
-5. Implement one full exchange + report flow.
-6. Playtest locally before considering any backend.
+1. Implement `RULES_SPEC_V1.md`.
+2. Scaffold the web app and GitHub Pages deployment.
+3. Implement the pure game domain layer.
+4. Build the 4-node board UI.
+5. Implement the 6+6 action sets.
+6. Implement ticking and visible-state feedback.
+7. Playtest locally before considering any backend.
 
 ---
 
 ## Bottom Line
-The right first implementation is a **small, static-deployable, locally persisted, single-board playable prototype**.
+The right first implementation is a **small, static-deployable, locally persisted, single-board, single-device playable prototype with visible ticking**.
 
 It should prove:
 - the board is readable
 - the hidden-action loop is interesting
 - the action economy creates choices
 - the candy-factory wrapper helps clarity and charm
+- visible ticking creates urgency without requiring real multiplayer
 
 Only after that should we decide whether to add real async backend support like Firebase.
