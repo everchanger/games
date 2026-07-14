@@ -1,0 +1,300 @@
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.5rem;
+}
+
+.hero-panel,
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 1.25rem;
+  box-shadow: var(--shadow);
+}
+
+.hero-panel {
+  display: flex;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  align-items: start;
+}
+
+.hero-copy {
+  max-width: 48rem;
+}
+
+.hero-actions,
+.viewer-toggle div,
+.target-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(16rem, 20rem) minmax(0, 1fr);
+  gap: 1.5rem;
+}
+
+.sidebar,
+.content-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.panel {
+  padding: 1.25rem;
+}
+
+.panel-heading,
+.stage-card-header,
+.summary-card-header,
+.meter-labels,
+.queue-panel li,
+.action-card-footer,
+.match-tile {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.panel-heading,
+.stage-card-header,
+.summary-card-header,
+.meter-labels,
+.action-card-footer {
+  align-items: start;
+}
+
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.pending-card,
+.waiting-card,
+.queue-panel,
+.summary-card,
+.action-card,
+.stage-card,
+.report-card,
+.match-tile,
+.history-item {
+  border: 1px solid var(--border-soft);
+  border-radius: 1rem;
+  background: var(--surface-soft);
+}
+
+.pending-card,
+.queue-panel,
+.summary-card,
+.action-card,
+.stage-card,
+.report-card,
+.waiting-card,
+.history-item {
+  padding: 1rem;
+}
+
+.meter {
+  height: 0.75rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--meter-bg);
+  margin-block: 0.5rem;
+}
+
+.meter-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-strong));
+  border-radius: inherit;
+}
+
+.match-list,
+.history-list,
+.action-grid,
+.stage-grid,
+.report-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.stage-grid,
+.report-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.action-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 1rem;
+}
+
+.match-tile {
+  width: 100%;
+  padding: 1rem;
+  text-align: left;
+  flex-direction: column;
+  align-items: start;
+}
+
+.match-tile.selected,
+button.selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.stage-card dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0 0;
+}
+
+.stage-card dt,
+.stage-card dd {
+  margin: 0;
+}
+
+.stage-card dd {
+  color: var(--heading);
+  font-weight: 600;
+}
+
+.queue-panel ol,
+.summary-card ul {
+  margin: 1rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.queue-panel li + li,
+.summary-card li + li {
+  margin-top: 0.75rem;
+}
+
+.history-item {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.composer-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.625rem;
+  border-radius: 999px;
+  background: var(--pill-bg);
+  color: var(--heading);
+  font-size: 0.9rem;
+}
+
+.pill.warning {
+  background: var(--warning-soft);
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.up {
+  color: var(--success);
+}
+
+.down,
+.error-text {
+  color: var(--danger);
+}
+
+button {
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: 0.8rem;
+  background: var(--accent);
+  color: white;
+  font: inherit;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+button.secondary,
+button.ghost {
+  background: var(--surface-soft);
+  color: var(--heading);
+  border-color: var(--border);
+}
+
+button.ghost {
+  padding: 0.35rem 0.75rem;
+}
+
+.submit-button {
+  justify-self: start;
+}
+
+h1,
+h2,
+h3,
+h4,
+strong {
+  color: var(--heading);
+}
+
+h1 {
+  margin: 0.4rem 0 0.8rem;
+  font-size: clamp(2.4rem, 5vw, 3.5rem);
+}
+
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+
+code {
+  background: var(--surface-soft);
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.35rem;
+}
+
+@media (max-width: 960px) {
+  .layout,
+  .status-grid,
+  .stage-grid,
+  .report-grid,
+  .action-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-panel {
+    flex-direction: column;
+  }
+}
